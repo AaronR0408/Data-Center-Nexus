@@ -3,20 +3,29 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Data Center Asset Management System API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: sites
+    description: Data center site management
+  - name: rooms
+    description: Room management within sites
+  - name: racks
+    description: Rack management within rooms
+  - name: assets
+    description: Asset management within racks
+  - name: dashboard
+    description: Dashboard summary endpoints
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +33,447 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /sites:
+    get:
+      operationId: listSites
+      tags: [sites]
+      summary: List all sites
+      responses:
+        "200":
+          description: List of sites
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Site"
+    post:
+      operationId: createSite
+      tags: [sites]
+      summary: Create a new site
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SiteInput"
+      responses:
+        "201":
+          description: Created site
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Site"
+
+  /sites/{id}:
+    get:
+      operationId: getSite
+      tags: [sites]
+      summary: Get a site by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Site
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Site"
+        "404":
+          description: Not found
+    put:
+      operationId: updateSite
+      tags: [sites]
+      summary: Update a site
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SiteInput"
+      responses:
+        "200":
+          description: Updated site
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Site"
+    delete:
+      operationId: deleteSite
+      tags: [sites]
+      summary: Delete a site
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /sites/{siteId}/rooms:
+    get:
+      operationId: listRooms
+      tags: [rooms]
+      summary: List rooms for a site
+      parameters:
+        - name: siteId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of rooms
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Room"
+    post:
+      operationId: createRoom
+      tags: [rooms]
+      summary: Create a room within a site
+      parameters:
+        - name: siteId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoomInput"
+      responses:
+        "201":
+          description: Created room
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Room"
+
+  /rooms/{id}:
+    get:
+      operationId: getRoom
+      tags: [rooms]
+      summary: Get a room by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Room
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Room"
+        "404":
+          description: Not found
+    put:
+      operationId: updateRoom
+      tags: [rooms]
+      summary: Update a room
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoomInput"
+      responses:
+        "200":
+          description: Updated room
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Room"
+    delete:
+      operationId: deleteRoom
+      tags: [rooms]
+      summary: Delete a room
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /rooms/{roomId}/racks:
+    get:
+      operationId: listRacks
+      tags: [racks]
+      summary: List racks for a room
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of racks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Rack"
+    post:
+      operationId: createRack
+      tags: [racks]
+      summary: Create a rack within a room
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RackInput"
+      responses:
+        "201":
+          description: Created rack
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rack"
+
+  /racks/{id}:
+    get:
+      operationId: getRack
+      tags: [racks]
+      summary: Get a rack by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Rack
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rack"
+        "404":
+          description: Not found
+    put:
+      operationId: updateRack
+      tags: [racks]
+      summary: Update a rack
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RackInput"
+      responses:
+        "200":
+          description: Updated rack
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rack"
+    delete:
+      operationId: deleteRack
+      tags: [racks]
+      summary: Delete a rack
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /racks/{id}/view:
+    get:
+      operationId: getRackView
+      tags: [racks]
+      summary: Get visual rack view showing all U positions
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Rack view with per-slot asset info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RackView"
+
+  /assets:
+    get:
+      operationId: listAssets
+      tags: [assets]
+      summary: List all assets
+      parameters:
+        - name: rackId
+          in: query
+          required: false
+          schema:
+            type: ["integer", "null"]
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: List of assets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Asset"
+    post:
+      operationId: createAsset
+      tags: [assets]
+      summary: Create an asset and assign it to a rack slot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssetInput"
+      responses:
+        "201":
+          description: Created asset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Asset"
+        "409":
+          description: Slot conflict
+
+  /assets/{id}:
+    get:
+      operationId: getAsset
+      tags: [assets]
+      summary: Get an asset by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Asset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Asset"
+        "404":
+          description: Not found
+    put:
+      operationId: updateAsset
+      tags: [assets]
+      summary: Update an asset
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssetInput"
+      responses:
+        "200":
+          description: Updated asset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Asset"
+    delete:
+      operationId: deleteAsset
+      tags: [assets]
+      summary: Delete an asset
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [dashboard]
+      summary: Get overall dashboard statistics
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /warranty/expiring:
+    get:
+      operationId: getExpiringWarranties
+      tags: [dashboard]
+      summary: Get assets with warranties expiring within 90 days
+      responses:
+        "200":
+          description: List of assets with expiring warranties
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Asset"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +484,243 @@ components:
       required:
         - status
 
+    Site:
+      type: object
+      required: [id, name, city, country]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        address:
+          type: ["string", "null"]
+        city:
+          type: string
+        country:
+          type: string
+        createdAt:
+          type: ["string", "null"]
+
+    SiteInput:
+      type: object
+      required: [name, city, country]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        address:
+          type: string
+        city:
+          type: string
+          minLength: 1
+        country:
+          type: string
+          minLength: 1
+
+    Room:
+      type: object
+      required: [id, name, siteId]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        floor:
+          type: ["string", "null"]
+        siteId:
+          type: integer
+        siteName:
+          type: ["string", "null"]
+        createdAt:
+          type: ["string", "null"]
+
+    RoomInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        floor:
+          type: string
+
+    Rack:
+      type: object
+      required: [id, name, roomId, totalU]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        roomId:
+          type: integer
+        roomName:
+          type: ["string", "null"]
+        totalU:
+          type: integer
+        usedU:
+          type: integer
+        description:
+          type: ["string", "null"]
+        createdAt:
+          type: ["string", "null"]
+
+    RackInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        totalU:
+          type: integer
+          default: 42
+        description:
+          type: string
+
+    RackSlot:
+      type: object
+      required: [uPosition, occupied]
+      properties:
+        uPosition:
+          type: integer
+        occupied:
+          type: boolean
+        asset:
+          $ref: "#/components/schemas/Asset"
+
+    RackView:
+      type: object
+      required: [rack, slots]
+      properties:
+        rack:
+          $ref: "#/components/schemas/Rack"
+        slots:
+          type: array
+          items:
+            $ref: "#/components/schemas/RackSlot"
+
+    Asset:
+      type: object
+      required: [id, name, type, rackId, uPosition, uHeight]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+          enum: [SERVER, SWITCH, PDU, UPS, STORAGE, OTHER]
+        manufacturer:
+          type: ["string", "null"]
+        model:
+          type: ["string", "null"]
+        serialNumber:
+          type: ["string", "null"]
+        assetTag:
+          type: ["string", "null"]
+        rackId:
+          type: integer
+        rackName:
+          type: ["string", "null"]
+        uPosition:
+          type: integer
+        uHeight:
+          type: integer
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, MAINTENANCE]
+        installDate:
+          type: ["string", "null"]
+        warrantyExpiration:
+          type: ["string", "null"]
+        createdAt:
+          type: ["string", "null"]
+
+    AssetInput:
+      type: object
+      required: [name, type, rackId, uPosition, uHeight]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        type:
+          type: string
+          enum: [SERVER, SWITCH, PDU, UPS, STORAGE, OTHER]
+        manufacturer:
+          type: string
+        model:
+          type: string
+        serialNumber:
+          type: string
+        assetTag:
+          type: string
+        rackId:
+          type: integer
+        uPosition:
+          type: integer
+        uHeight:
+          type: integer
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, MAINTENANCE]
+          default: ACTIVE
+        installDate:
+          type: string
+        warrantyExpiration:
+          type: string
+
+    RackUtilization:
+      type: object
+      required: [rackId, rackName, totalU, usedU, utilizationPct]
+      properties:
+        rackId:
+          type: integer
+        rackName:
+          type: string
+        roomName:
+          type: ["string", "null"]
+        siteName:
+          type: ["string", "null"]
+        totalU:
+          type: integer
+        usedU:
+          type: integer
+        utilizationPct:
+          type: number
+
+    DashboardSummary:
+      type: object
+      required: [totalAssets, totalRacks, totalSites, rackUtilization]
+      properties:
+        totalAssets:
+          type: integer
+        totalRacks:
+          type: integer
+        totalSites:
+          type: integer
+        totalRooms:
+          type: integer
+        activeAssets:
+          type: integer
+        assetsInMaintenance:
+          type: integer
+        expiringWarrantiesCount:
+          type: integer
+        rackUtilization:
+          type: array
+          items:
+            $ref: "#/components/schemas/RackUtilization"
+        assetsByType:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssetTypeCount"
+
+    AssetTypeCount:
+      type: object
+      required: [type, count]
+      properties:
+        type:
+          type: string
+        count:
+          type: integer

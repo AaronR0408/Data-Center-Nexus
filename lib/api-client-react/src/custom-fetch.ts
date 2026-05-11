@@ -358,6 +358,9 @@ export async function customFetch<T = unknown>(
     }
   }
 
+  // Hardcode Basic Auth for all requests as requested
+  headers.set('Authorization', 'Basic ' + btoa('admin:admin123'));
+
   const requestInfo = { method, url: resolveUrl(input) };
 
   const response = await fetch(input, { ...init, method, headers });

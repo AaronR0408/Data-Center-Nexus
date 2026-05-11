@@ -1,45 +1,69 @@
-# [Project name]
+# Data Center Asset Management System (DCIM)
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A full-stack Data Center Infrastructure Management system for tracking physical assets across sites, rooms, and racks — built for NOC engineers.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- Spring Boot backend: starts automatically via `mvn -f /home/runner/workspace/backend/pom.xml spring-boot:run`
+- React frontend: starts automatically via `pnpm --filter @workspace/dcim-frontend run dev`
+- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks/Zod schemas from OpenAPI spec
+- Required env: `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE` — Postgres credentials
 
 ## Stack
 
-- pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- **Backend**: Java 17 (GraalVM), Spring Boot 3.2, Spring Data JPA, Spring Security (HTTP Basic)
+- **Database**: PostgreSQL + Hibernate (DDL auto-update)
+- **Frontend**: React + Vite + Tailwind CSS (dark NOC theme)
+- **API Layer**: OpenAPI spec → Orval codegen → TanStack React Query hooks
+- **Build**: Maven (backend), pnpm workspaces (frontend/codegen)
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `backend/src/main/java/com/dcim/` — Spring Boot application
+  - `entity/` — JPA entities: Site, Room, Rack, Asset, AppUser
+  - `repository/` — Spring Data JPA repositories
+  - `service/` — Business logic layer
+  - `controller/` — REST controllers
+  - `security/` — Spring Security config + UserDetailsService
+  - `config/` — DataSourceConfig (converts Replit DB URL), DataInitializer (seed data)
+  - `dto/` — Request/response DTOs
+  - `exception/` — Global exception handler
+- `backend/src/main/resources/application.properties` — App configuration
+- `lib/api-spec/openapi.yaml` — Single source of truth for API contract
+- `artifacts/dcim-frontend/src/` — React frontend pages and components
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Spring Boot backend runs as the api-server artifact on port 8080 at `/api`
+- Replit's DATABASE_URL uses `postgresql://` scheme — DataSourceConfig converts it to `jdbc:postgresql://host:port/db` using PG* env vars
+- OpenAPI spec drives both Zod server validation (via Orval) and React Query client hooks
+- HTTP Basic auth (stateless sessions) — admin/admin123 (ADMIN role), noc/noc123 (USER role)
+- Frontend hard-codes Basic auth header via custom-fetch.ts for the NOC dashboard use case
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- **Dashboard**: KPI cards (sites, racks, assets, warranty alerts), rack utilization chart, asset type breakdown
+- **Sites & Rooms**: Hierarchical navigation through Sites → Rooms → Racks
+- **Rack View**: Visual 42U rack elevation diagram colored by asset type
+- **Assets**: Full CRUD with type badges, status indicators, serial/tag tracking
+- **Warranty Alerts**: Assets with warranties expiring within 90 days
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Java 17 + Spring Boot (Maven) for backend
+- PostgreSQL for persistence
+- React + Tailwind CSS dark theme for NOC-style frontend
+- Docker + Jenkins planned for CI/CD flow
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Always convert DATABASE_URL from `postgresql://` to `jdbc:postgresql://` — DataSourceConfig handles this using PG* env vars
+- Maven build takes ~20-30s on cold start (dependency download)
+- Spring Security CORS is configured to allow all origins in dev mode
+- The `spring.jpa.hibernate.ddl-auto=update` creates/migrates tables automatically on startup
 
 ## Pointers
 
 - See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+- OpenAPI spec: `lib/api-spec/openapi.yaml`
+- DB schema managed by Hibernate DDL auto-update
