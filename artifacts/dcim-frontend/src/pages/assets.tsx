@@ -1,9 +1,11 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
   useListAssets,
   useCreateAsset,
   useUpdateAsset,
   useDeleteAsset,
+  updateAsset as rawUpdateAsset,
+  deleteAsset as rawDeleteAsset,
   getListAssetsQueryKey,
   AssetStatus,
   AssetType,
@@ -14,6 +16,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -30,11 +33,12 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Plus, Trash2, Search, Filter, X, ChevronDown, ChevronUp, Pencil, Save, AlertTriangle,
+  Plus, Trash2, Search, Filter, X, ChevronDown, ChevronUp,
+  Pencil, Save, AlertTriangle, CheckSquare, Loader2, Tag,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-// ── colour maps ──────────────────────────────────────────────────────────────
+// ── colour maps ───────────────────────────────────────────────────────────────
 const TYPE_COLORS: Record<string, string> = {
   SERVER:  "border-blue-500/40  bg-blue-500/10  text-blue-400  data-[active=true]:bg-blue-500/30  data-[active=true]:border-blue-400",
   SWITCH:  "border-green-500/40 bg-green-500/10 text-green-400 data-[active=true]:bg-green-500/30 data-[active=true]:border-green-400",
@@ -43,124 +47,97 @@ const TYPE_COLORS: Record<string, string> = {
   STORAGE: "border-pink-500/40  bg-pink-500/10  text-pink-400  data-[active=true]:bg-pink-500/30  data-[active=true]:border-pink-400",
   OTHER:   "border-border        bg-secondary/30 text-muted-foreground data-[active=true]:bg-secondary data-[active=true]:border-foreground/30",
 };
-
 const STATUS_COLORS: Record<string, string> = {
   ACTIVE:      "border-green-500/40 bg-green-500/10 text-green-400 data-[active=true]:bg-green-500/30 data-[active=true]:border-green-400",
   MAINTENANCE: "border-amber-500/40 bg-amber-500/10 text-amber-400 data-[active=true]:bg-amber-500/30 data-[active=true]:border-amber-400",
   INACTIVE:    "border-border       bg-secondary/30 text-muted-foreground data-[active=true]:bg-secondary data-[active=true]:border-foreground/30",
 };
 
-function toggle<T>(set: Set<T>, v: T): Set<T> {
-  const n = new Set(set);
-  n.has(v) ? n.delete(v) : n.add(v);
-  return n;
+function toggleSet<T>(s: Set<T>, v: T): Set<T> {
+  const n = new Set(s); n.has(v) ? n.delete(v) : n.add(v); return n;
 }
+function isoDate(s: string | null | undefined) { return s ? s.slice(0, 10) : ""; }
 
-function isoDate(s: string | null | undefined) {
-  if (!s) return "";
-  return s.slice(0, 10); // yyyy-mm-dd
-}
-
-// ── edit form state shape ────────────────────────────────────────────────────
+// ── edit state ────────────────────────────────────────────────────────────────
 interface EditState {
-  name: string;
-  type: AssetInputType;
-  manufacturer: string;
-  model: string;
-  serialNumber: string;
-  assetTag: string;
-  rackId: string;
-  uPosition: string;
-  uHeight: string;
-  status: AssetInputStatus;
-  installDate: string;
-  warrantyExpiration: string;
+  name: string; type: AssetInputType; manufacturer: string; model: string;
+  serialNumber: string; assetTag: string; rackId: string; uPosition: string;
+  uHeight: string; status: AssetInputStatus; installDate: string; warrantyExpiration: string;
 }
-
 function assetToEdit(a: Asset): EditState {
   return {
-    name:               a.name,
-    type:               a.type as AssetInputType,
-    manufacturer:       a.manufacturer ?? "",
-    model:              a.model ?? "",
-    serialNumber:       a.serialNumber ?? "",
-    assetTag:           a.assetTag ?? "",
-    rackId:             String(a.rackId),
-    uPosition:          String(a.uPosition),
-    uHeight:            String(a.uHeight),
-    status:             (a.status as AssetInputStatus) ?? AssetInputStatus.ACTIVE,
-    installDate:        isoDate(a.installDate),
-    warrantyExpiration: isoDate(a.warrantyExpiration),
+    name: a.name, type: a.type as AssetInputType,
+    manufacturer: a.manufacturer ?? "", model: a.model ?? "",
+    serialNumber: a.serialNumber ?? "", assetTag: a.assetTag ?? "",
+    rackId: String(a.rackId), uPosition: String(a.uPosition), uHeight: String(a.uHeight),
+    status: (a.status as AssetInputStatus) ?? AssetInputStatus.ACTIVE,
+    installDate: isoDate(a.installDate), warrantyExpiration: isoDate(a.warrantyExpiration),
   };
 }
 
+// ── component ─────────────────────────────────────────────────────────────────
 export default function Assets() {
   const { data: assets, isLoading } = useListAssets();
   const queryClient = useQueryClient();
-  const { toast }   = useToast();
+  const { toast } = useToast();
 
-  // ── filter state ─────────────────────────────────────────────
-  const [showFilters, setShowFilters]   = useState(false);
-  const [searchTerm, setSearchTerm]     = useState("");
-  const [typeFilter, setTypeFilter]     = useState<Set<string>>(new Set());
+  // filter
+  const [showFilters, setShowFilters] = useState(false);
+  const [searchTerm, setSearchTerm]   = useState("");
+  const [typeFilter, setTypeFilter]   = useState<Set<string>>(new Set());
   const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set());
-  const [rackFilter, setRackFilter]     = useState("ALL");
+  const [rackFilter, setRackFilter]   = useState("ALL");
 
-  // ── edit sheet state ──────────────────────────────────────────
-  const [editAsset, setEditAsset]   = useState<Asset | null>(null);
-  const [editState, setEditState]   = useState<EditState | null>(null);
-  const [sheetOpen, setSheetOpen]   = useState(false);
+  // selection
+  const [selected, setSelected]       = useState<Set<number>>(new Set());
+  const [bulkStatus, setBulkStatus]   = useState<AssetInputStatus>(AssetInputStatus.ACTIVE);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const headerCheckRef = useRef<HTMLButtonElement>(null);
 
-  // sync form when asset selection changes
-  useEffect(() => {
-    if (editAsset) setEditState(assetToEdit(editAsset));
-  }, [editAsset]);
+  // edit sheet
+  const [editAsset, setEditAsset] = useState<Asset | null>(null);
+  const [editState, setEditState] = useState<EditState | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  useEffect(() => { if (editAsset) setEditState(assetToEdit(editAsset)); }, [editAsset]);
 
   const openEdit = (a: Asset, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setEditAsset(a);
-    setSheetOpen(true);
+    e.stopPropagation(); setEditAsset(a); setSheetOpen(true);
   };
+  const setField = (f: keyof EditState) => (v: string) =>
+    setEditState((p) => p ? { ...p, [f]: v } : p);
 
-  const set = (field: keyof EditState) => (val: string) =>
-    setEditState((prev) => prev ? { ...prev, [field]: val } : prev);
-
-  // ── create form state ─────────────────────────────────────────
-  const [isOpen, setIsOpen]               = useState(false);
-  const [name, setName]                   = useState("");
-  const [type, setType]                   = useState<AssetInputType>(AssetInputType.SERVER);
-  const [manufacturer, setManufacturer]   = useState("");
-  const [model, setModel]                 = useState("");
-  const [serialNumber, setSerialNumber]   = useState("");
-  const [rackId, setRackId]               = useState("");
-  const [uPosition, setUPosition]         = useState("1");
-  const [uHeight, setUHeight]             = useState("1");
-  const [status, setStatus]               = useState<AssetInputStatus>(AssetInputStatus.ACTIVE);
+  // create form
+  const [isOpen, setIsOpen]             = useState(false);
+  const [name, setName]                 = useState("");
+  const [type, setType]                 = useState<AssetInputType>(AssetInputType.SERVER);
+  const [manufacturer, setManufacturer] = useState("");
+  const [model, setModel]               = useState("");
+  const [serialNumber, setSerialNumber] = useState("");
+  const [rackId, setRackId]             = useState("");
+  const [uPosition, setUPosition]       = useState("1");
+  const [uHeight, setUHeight]           = useState("1");
+  const [status, setStatus]             = useState<AssetInputStatus>(AssetInputStatus.ACTIVE);
 
   const createAsset = useCreateAsset();
   const updateAsset = useUpdateAsset();
   const deleteAsset = useDeleteAsset();
 
-  // ── derived data ──────────────────────────────────────────────
+  // derived
   const uniqueRacks = useMemo(() => {
     if (!assets) return [];
     const seen = new Map<number, string>();
-    assets.forEach((a) => {
-      if (!seen.has(a.rackId)) seen.set(a.rackId, a.rackName ?? `Rack ${a.rackId}`);
-    });
+    assets.forEach((a) => { if (!seen.has(a.rackId)) seen.set(a.rackId, a.rackName ?? `Rack ${a.rackId}`); });
     return Array.from(seen.entries()).sort((a, b) => a[1].localeCompare(b[1]));
   }, [assets]);
 
-  const activeFilterCount =
-    typeFilter.size + statusFilter.size + (rackFilter !== "ALL" ? 1 : 0);
+  const activeFilterCount = typeFilter.size + statusFilter.size + (rackFilter !== "ALL" ? 1 : 0);
 
   const filteredAssets = useMemo(() => {
     if (!assets) return [];
     const q = searchTerm.trim().toLowerCase();
     return assets.filter((a) => {
       if (q) {
-        const hit =
-          a.name.toLowerCase().includes(q) ||
+        const hit = a.name.toLowerCase().includes(q) ||
           (a.serialNumber ?? "").toLowerCase().includes(q) ||
           (a.manufacturer ?? "").toLowerCase().includes(q) ||
           (a.model ?? "").toLowerCase().includes(q) ||
@@ -175,11 +152,39 @@ export default function Assets() {
     });
   }, [assets, searchTerm, typeFilter, statusFilter, rackFilter]);
 
+  // clear selection when filtered list changes
+  useEffect(() => { setSelected(new Set()); }, [filteredAssets]);
+
   const clearAll = () => {
     setSearchTerm(""); setTypeFilter(new Set()); setStatusFilter(new Set()); setRackFilter("ALL");
   };
 
-  // ── helpers ───────────────────────────────────────────────────
+  // selection helpers
+  const filteredIds = useMemo(() => new Set(filteredAssets.map((a) => a.id)), [filteredAssets]);
+  const allSelected = filteredAssets.length > 0 && filteredAssets.every((a) => selected.has(a.id));
+  const someSelected = !allSelected && filteredAssets.some((a) => selected.has(a.id));
+  const selectedCount = [...selected].filter((id) => filteredIds.has(id)).length;
+
+  // keep header checkbox indeterminate state in sync
+  useEffect(() => {
+    if (headerCheckRef.current) {
+      // Radix Checkbox doesn't expose indeterminate directly via ref; use the data attr approach via state
+    }
+  }, [allSelected, someSelected]);
+
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelected((p) => { const n = new Set(p); filteredAssets.forEach((a) => n.delete(a.id)); return n; });
+    } else {
+      setSelected((p) => { const n = new Set(p); filteredAssets.forEach((a) => n.add(a.id)); return n; });
+    }
+  };
+  const toggleRow = (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelected((p) => toggleSet(p, id));
+  };
+
+  // helpers
   const getStatusClass = (s?: AssetStatus) => {
     switch (s) {
       case AssetStatus.ACTIVE:      return "text-green-500 border-green-500/30 bg-green-500/10";
@@ -187,14 +192,10 @@ export default function Assets() {
       default:                      return "text-muted-foreground border-border bg-secondary/50";
     }
   };
-
   const getTypeBadge = (t: string) => {
-    const c = (TYPE_COLORS[t] ?? TYPE_COLORS.OTHER)
-      .replace(/data-\[active=true\]:[^ ]*/g, "").trim();
+    const c = (TYPE_COLORS[t] ?? TYPE_COLORS.OTHER).replace(/data-\[active=true\]:[^ ]*/g, "").trim();
     return `text-[10px] font-mono px-2 py-1 border rounded uppercase tracking-widest ${c}`;
   };
-
-  // warranty badge
   const warrantyBadge = (exp?: string | null) => {
     if (!exp) return null;
     const days = Math.ceil((new Date(exp).getTime() - Date.now()) / 86_400_000);
@@ -203,7 +204,7 @@ export default function Assets() {
     return null;
   };
 
-  // ── handlers ──────────────────────────────────────────────────
+  // ── handlers ──────────────────────────────────────────────────────────────
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     createAsset.mutate(
@@ -227,18 +228,12 @@ export default function Assets() {
       {
         id: editAsset.id,
         data: {
-          name:               editState.name,
-          type:               editState.type,
-          manufacturer:       editState.manufacturer || undefined,
-          model:              editState.model || undefined,
-          serialNumber:       editState.serialNumber || undefined,
-          assetTag:           editState.assetTag || undefined,
-          rackId:             parseInt(editState.rackId, 10),
-          uPosition:          parseInt(editState.uPosition, 10),
-          uHeight:            parseInt(editState.uHeight, 10),
-          status:             editState.status,
-          installDate:        editState.installDate || undefined,
-          warrantyExpiration: editState.warrantyExpiration || undefined,
+          name: editState.name, type: editState.type,
+          manufacturer: editState.manufacturer || undefined, model: editState.model || undefined,
+          serialNumber: editState.serialNumber || undefined, assetTag: editState.assetTag || undefined,
+          rackId: parseInt(editState.rackId, 10), uPosition: parseInt(editState.uPosition, 10),
+          uHeight: parseInt(editState.uHeight, 10), status: editState.status,
+          installDate: editState.installDate || undefined, warrantyExpiration: editState.warrantyExpiration || undefined,
         },
       },
       {
@@ -265,7 +260,57 @@ export default function Assets() {
     }
   };
 
-  // ── render ────────────────────────────────────────────────────
+  // ── bulk handlers ─────────────────────────────────────────────────────────
+  const selectedAssets = useMemo(
+    () => (assets ?? []).filter((a) => selected.has(a.id) && filteredIds.has(a.id)),
+    [assets, selected, filteredIds]
+  );
+
+  const handleBulkStatus = useCallback(async () => {
+    if (!selectedAssets.length) return;
+    setBulkLoading(true);
+    try {
+      await Promise.all(
+        selectedAssets.map((a) =>
+          rawUpdateAsset(a.id, {
+            name: a.name, type: a.type as AssetInputType,
+            manufacturer: a.manufacturer ?? undefined, model: a.model ?? undefined,
+            serialNumber: a.serialNumber ?? undefined, assetTag: a.assetTag ?? undefined,
+            rackId: a.rackId, uPosition: a.uPosition, uHeight: a.uHeight,
+            status: bulkStatus,
+            installDate: a.installDate ?? undefined,
+            warrantyExpiration: a.warrantyExpiration ?? undefined,
+          })
+        )
+      );
+      queryClient.invalidateQueries({ queryKey: getListAssetsQueryKey() });
+      toast({ title: "Status Updated", description: `${selectedAssets.length} asset${selectedAssets.length !== 1 ? "s" : ""} set to ${bulkStatus}.` });
+      setSelected(new Set());
+    } catch {
+      toast({ title: "Bulk Update Failed", description: "Some assets could not be updated.", variant: "destructive" });
+    } finally {
+      setBulkLoading(false);
+    }
+  }, [selectedAssets, bulkStatus, queryClient, toast]);
+
+  const handleBulkDelete = useCallback(async () => {
+    if (!selectedAssets.length) return;
+    if (!confirm(`Decommission ${selectedAssets.length} asset${selectedAssets.length !== 1 ? "s" : ""}? This cannot be undone.`)) return;
+    setBulkLoading(true);
+    try {
+      await Promise.all(selectedAssets.map((a) => rawDeleteAsset(a.id)));
+      queryClient.invalidateQueries({ queryKey: getListAssetsQueryKey() });
+      toast({ title: "Decommissioned", description: `${selectedAssets.length} asset${selectedAssets.length !== 1 ? "s" : ""} removed from inventory.` });
+      setSelected(new Set());
+      if (editAsset && selected.has(editAsset.id)) setSheetOpen(false);
+    } catch {
+      toast({ title: "Bulk Delete Failed", description: "Some assets could not be removed.", variant: "destructive" });
+    } finally {
+      setBulkLoading(false);
+    }
+  }, [selectedAssets, queryClient, toast, editAsset, selected]);
+
+  // ── render ────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
 
@@ -394,7 +439,7 @@ export default function Assets() {
                 const active = typeFilter.has(t);
                 return (
                   <button key={t} data-active={active}
-                    onClick={() => setTypeFilter((p) => toggle(p, t))}
+                    onClick={() => setTypeFilter((p) => toggleSet(p, t))}
                     className={`font-mono text-[10px] px-3 py-1 rounded border uppercase tracking-widest transition-all cursor-pointer ${TYPE_COLORS[t] ?? TYPE_COLORS.OTHER}`}>
                     {active && <span className="mr-1">✓</span>}{t}
                   </button>
@@ -409,7 +454,7 @@ export default function Assets() {
                 const active = statusFilter.has(s);
                 return (
                   <button key={s} data-active={active}
-                    onClick={() => setStatusFilter((p) => toggle(p, s))}
+                    onClick={() => setStatusFilter((p) => toggleSet(p, s))}
                     className={`font-mono text-[10px] px-3 py-1 rounded border uppercase tracking-widest transition-all cursor-pointer inline-flex items-center gap-1.5 ${STATUS_COLORS[s] ?? STATUS_COLORS.INACTIVE}`}>
                     {active && <span>✓</span>}<span className="w-1.5 h-1.5 rounded-full bg-current" />{s}
                   </button>
@@ -446,11 +491,92 @@ export default function Assets() {
         </div>
       )}
 
+      {/* ── Bulk-action toolbar ──────────────────────────────────── */}
+      {selectedCount > 0 && (
+        <div className="flex items-center gap-3 rounded-md border border-primary/30 bg-primary/5 px-4 py-2.5 animate-in slide-in-from-top-1 duration-150">
+          {/* Count + deselect */}
+          <div className="flex items-center gap-2 flex-1">
+            <CheckSquare className="h-4 w-4 text-primary shrink-0" />
+            <span className="font-mono text-xs text-primary font-semibold">
+              {selectedCount} asset{selectedCount !== 1 ? "s" : ""} selected
+            </span>
+            <button
+              onClick={() => setSelected(new Set())}
+              className="ml-1 text-muted-foreground hover:text-foreground transition-colors"
+              title="Clear selection"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          {/* Divider */}
+          <div className="h-5 w-px bg-border" />
+
+          {/* Set Status */}
+          <div className="flex items-center gap-2">
+            <Tag className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground whitespace-nowrap">Set status:</span>
+            <Select value={bulkStatus} onValueChange={(v) => setBulkStatus(v as AssetInputStatus)}>
+              <SelectTrigger className="font-mono text-xs bg-background h-7 w-36 border-border">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={AssetInputStatus.ACTIVE} className="font-mono text-xs">
+                  <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-green-400" />ACTIVE</span>
+                </SelectItem>
+                <SelectItem value={AssetInputStatus.MAINTENANCE} className="font-mono text-xs">
+                  <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" />MAINTENANCE</span>
+                </SelectItem>
+                <SelectItem value={AssetInputStatus.INACTIVE} className="font-mono text-xs">
+                  <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />INACTIVE</span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleBulkStatus}
+              disabled={bulkLoading}
+              className="font-mono text-xs uppercase tracking-wider h-7 px-3 border-border hover:border-primary/50 hover:text-primary gap-1.5"
+            >
+              {bulkLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              Apply
+            </Button>
+          </div>
+
+          {/* Divider */}
+          <div className="h-5 w-px bg-border" />
+
+          {/* Decommission */}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={handleBulkDelete}
+            disabled={bulkLoading}
+            className="font-mono text-xs uppercase tracking-wider h-7 px-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10 gap-1.5"
+          >
+            {bulkLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+            Decommission
+          </Button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="border border-border rounded-md bg-card/50 overflow-hidden">
         <Table>
           <TableHeader className="bg-secondary/50">
             <TableRow className="border-border hover:bg-transparent">
+              {/* Select-all checkbox */}
+              <TableHead className="w-10 pl-4">
+                <Checkbox
+                  ref={headerCheckRef}
+                  checked={allSelected ? true : someSelected ? "indeterminate" : false}
+                  onCheckedChange={toggleAll}
+                  aria-label="Select all visible"
+                  className="border-muted-foreground/40"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </TableHead>
               <TableHead className="font-mono text-xs uppercase tracking-wider">Asset</TableHead>
               <TableHead className="font-mono text-xs uppercase tracking-wider">Type</TableHead>
               <TableHead className="font-mono text-xs uppercase tracking-wider">Location</TableHead>
@@ -462,75 +588,86 @@ export default function Assets() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={7} className="h-24 text-center font-mono text-xs text-muted-foreground uppercase tracking-widest">Querying database…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="h-24 text-center font-mono text-xs text-muted-foreground uppercase tracking-widest">Querying database…</TableCell></TableRow>
             ) : filteredAssets.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="h-24 text-center font-mono text-xs text-muted-foreground uppercase tracking-widest">No assets match criteria</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="h-24 text-center font-mono text-xs text-muted-foreground uppercase tracking-widest">No assets match criteria</TableCell></TableRow>
             ) : (
-              filteredAssets.map((asset) => (
-                <TableRow
-                  key={asset.id}
-                  onClick={(e) => openEdit(asset, e)}
-                  className="border-border transition-colors hover:bg-secondary/20 group cursor-pointer"
-                >
-                  <TableCell>
-                    <div className="font-bold font-mono text-sm text-foreground">{asset.name}</div>
-                    <div className="text-xs text-muted-foreground font-mono mt-1 opacity-50">{asset.assetTag ?? "NO TAG"}</div>
-                  </TableCell>
-                  <TableCell>
-                    <span className={getTypeBadge(asset.type)}>{asset.type}</span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="font-mono text-xs">
-                      <Link href={`/racks/${asset.rackId}/view`} onClick={(e) => e.stopPropagation()} className="text-primary hover:underline">
-                        {asset.rackName}
-                      </Link>
-                    </div>
-                    <div className="text-xs text-muted-foreground font-mono mt-1">U{asset.uPosition} ({asset.uHeight}U)</div>
-                  </TableCell>
-                  <TableCell>
-                    <span className={`text-[10px] font-mono px-2 py-1 border rounded uppercase tracking-widest inline-flex items-center gap-1.5 ${getStatusClass(asset.status)}`}>
-                      <span className="w-1.5 h-1.5 rounded-full bg-current" />{asset.status}
-                    </span>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">
-                    <div>{asset.manufacturer ?? "N/A"} {asset.model ?? ""}</div>
-                    <div className="mt-1 opacity-50">{asset.serialNumber ?? "SN UNKNOWN"}</div>
-                  </TableCell>
-                  <TableCell>
-                    {warrantyBadge(asset.warrantyExpiration)}
-                    {!asset.warrantyExpiration && <span className="text-[10px] font-mono text-muted-foreground opacity-40">—</span>}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button variant="ghost" size="icon" onClick={(e) => openEdit(asset, e)}
-                        className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10">
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={(e) => handleDelete(asset.id, asset.name, e)}
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+              filteredAssets.map((asset) => {
+                const isSelected = selected.has(asset.id);
+                return (
+                  <TableRow
+                    key={asset.id}
+                    onClick={(e) => openEdit(asset, e)}
+                    data-selected={isSelected}
+                    className="border-border transition-colors hover:bg-secondary/20 group cursor-pointer data-[selected=true]:bg-primary/5 data-[selected=true]:border-l-2 data-[selected=true]:border-l-primary"
+                  >
+                    {/* Row checkbox */}
+                    <TableCell className="w-10 pl-4" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => setSelected((p) => toggleSet(p, asset.id))}
+                        aria-label={`Select ${asset.name}`}
+                        className="border-muted-foreground/40"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-bold font-mono text-sm text-foreground">{asset.name}</div>
+                      <div className="text-xs text-muted-foreground font-mono mt-1 opacity-50">{asset.assetTag ?? "NO TAG"}</div>
+                    </TableCell>
+                    <TableCell>
+                      <span className={getTypeBadge(asset.type)}>{asset.type}</span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-mono text-xs">
+                        <Link href={`/racks/${asset.rackId}/view`} onClick={(e) => e.stopPropagation()} className="text-primary hover:underline">
+                          {asset.rackName}
+                        </Link>
+                      </div>
+                      <div className="text-xs text-muted-foreground font-mono mt-1">U{asset.uPosition} ({asset.uHeight}U)</div>
+                    </TableCell>
+                    <TableCell>
+                      <span className={`text-[10px] font-mono px-2 py-1 border rounded uppercase tracking-widest inline-flex items-center gap-1.5 ${getStatusClass(asset.status)}`}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-current" />{asset.status}
+                      </span>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      <div>{asset.manufacturer ?? "N/A"} {asset.model ?? ""}</div>
+                      <div className="mt-1 opacity-50">{asset.serialNumber ?? "SN UNKNOWN"}</div>
+                    </TableCell>
+                    <TableCell>
+                      {warrantyBadge(asset.warrantyExpiration)}
+                      {!asset.warrantyExpiration && <span className="text-[10px] font-mono text-muted-foreground opacity-40">—</span>}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button variant="ghost" size="icon" onClick={(e) => openEdit(asset, e)}
+                          className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={(e) => handleDelete(asset.id, asset.name, e)}
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
       </div>
 
-      {/* ── Edit Sheet ───────────────────────────────────────────── */}
+      {/* ── Edit Sheet ─────────────────────────────────────────── */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent className="w-[420px] sm:w-[480px] bg-card border-border overflow-y-auto flex flex-col gap-0 p-0">
           {editAsset && editState && (
             <form onSubmit={handleSave} className="flex flex-col h-full">
-              {/* Sheet header */}
               <SheetHeader className="px-6 pt-6 pb-4 border-b border-border">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <SheetTitle className="font-mono uppercase tracking-widest text-primary text-base">
-                      Edit Asset
-                    </SheetTitle>
+                    <SheetTitle className="font-mono uppercase tracking-widest text-primary text-base">Edit Asset</SheetTitle>
                     <SheetDescription className="font-mono text-xs mt-1 text-muted-foreground">
                       #{editAsset.id} · {editAsset.assetTag ?? "NO TAG"}
                     </SheetDescription>
@@ -539,27 +676,24 @@ export default function Assets() {
                 </div>
               </SheetHeader>
 
-              {/* Form body */}
               <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-
-                {/* Identity */}
                 <section className="space-y-3">
                   <p className="font-mono text-[10px] uppercase tracking-widest text-primary">Identity</p>
                   <div className="space-y-1.5">
                     <Label className="text-xs uppercase tracking-wider text-muted-foreground">Name</Label>
-                    <Input value={editState.name} onChange={(e) => set("name")(e.target.value)} required className="font-mono bg-background text-sm" />
+                    <Input value={editState.name} onChange={(e) => setField("name")(e.target.value)} required className="font-mono bg-background text-sm" />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <Label className="text-xs uppercase tracking-wider text-muted-foreground">Type</Label>
-                      <Select value={editState.type} onValueChange={set("type")}>
+                      <Select value={editState.type} onValueChange={setField("type")}>
                         <SelectTrigger className="font-mono bg-background text-xs h-9"><SelectValue /></SelectTrigger>
                         <SelectContent>{Object.values(AssetInputType).map((t) => <SelectItem key={t} value={t} className="font-mono text-xs">{t}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs uppercase tracking-wider text-muted-foreground">Status</Label>
-                      <Select value={editState.status} onValueChange={set("status")}>
+                      <Select value={editState.status} onValueChange={setField("status")}>
                         <SelectTrigger className="font-mono bg-background text-xs h-9"><SelectValue /></SelectTrigger>
                         <SelectContent>{Object.values(AssetInputStatus).map((s) => <SelectItem key={s} value={s} className="font-mono text-xs">{s}</SelectItem>)}</SelectContent>
                       </Select>
@@ -568,59 +702,57 @@ export default function Assets() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <Label className="text-xs uppercase tracking-wider text-muted-foreground">Asset Tag</Label>
-                      <Input value={editState.assetTag} onChange={(e) => set("assetTag")(e.target.value)} className="font-mono bg-background text-xs h-9" placeholder="TAG-xxx" />
+                      <Input value={editState.assetTag} onChange={(e) => setField("assetTag")(e.target.value)} className="font-mono bg-background text-xs h-9" placeholder="TAG-xxx" />
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs uppercase tracking-wider text-muted-foreground">Serial No.</Label>
-                      <Input value={editState.serialNumber} onChange={(e) => set("serialNumber")(e.target.value)} className="font-mono bg-background text-xs h-9" />
+                      <Input value={editState.serialNumber} onChange={(e) => setField("serialNumber")(e.target.value)} className="font-mono bg-background text-xs h-9" />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <Label className="text-xs uppercase tracking-wider text-muted-foreground">Manufacturer</Label>
-                      <Input value={editState.manufacturer} onChange={(e) => set("manufacturer")(e.target.value)} className="font-mono bg-background text-xs h-9" />
+                      <Input value={editState.manufacturer} onChange={(e) => setField("manufacturer")(e.target.value)} className="font-mono bg-background text-xs h-9" />
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs uppercase tracking-wider text-muted-foreground">Model</Label>
-                      <Input value={editState.model} onChange={(e) => set("model")(e.target.value)} className="font-mono bg-background text-xs h-9" />
+                      <Input value={editState.model} onChange={(e) => setField("model")(e.target.value)} className="font-mono bg-background text-xs h-9" />
                     </div>
                   </div>
                 </section>
 
                 <Separator className="bg-border" />
 
-                {/* Location */}
                 <section className="space-y-3">
                   <p className="font-mono text-[10px] uppercase tracking-widest text-primary">Location & Placement</p>
                   <div className="space-y-1.5">
                     <Label className="text-xs uppercase tracking-wider text-muted-foreground">Rack ID</Label>
-                    <Input type="number" value={editState.rackId} onChange={(e) => set("rackId")(e.target.value)} required className="font-mono bg-background text-xs h-9" />
+                    <Input type="number" value={editState.rackId} onChange={(e) => setField("rackId")(e.target.value)} required className="font-mono bg-background text-xs h-9" />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <Label className="text-xs uppercase tracking-wider text-muted-foreground">Start U</Label>
-                      <Input type="number" min="1" value={editState.uPosition} onChange={(e) => set("uPosition")(e.target.value)} required className="font-mono bg-background text-xs h-9" />
+                      <Input type="number" min="1" value={editState.uPosition} onChange={(e) => setField("uPosition")(e.target.value)} required className="font-mono bg-background text-xs h-9" />
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs uppercase tracking-wider text-muted-foreground">Height (U)</Label>
-                      <Input type="number" min="1" value={editState.uHeight} onChange={(e) => set("uHeight")(e.target.value)} required className="font-mono bg-background text-xs h-9" />
+                      <Input type="number" min="1" value={editState.uHeight} onChange={(e) => setField("uHeight")(e.target.value)} required className="font-mono bg-background text-xs h-9" />
                     </div>
                   </div>
                 </section>
 
                 <Separator className="bg-border" />
 
-                {/* Lifecycle */}
                 <section className="space-y-3">
                   <p className="font-mono text-[10px] uppercase tracking-widest text-primary">Lifecycle</p>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <Label className="text-xs uppercase tracking-wider text-muted-foreground">Install Date</Label>
-                      <Input type="date" value={editState.installDate} onChange={(e) => set("installDate")(e.target.value)} className="font-mono bg-background text-xs h-9" />
+                      <Input type="date" value={editState.installDate} onChange={(e) => setField("installDate")(e.target.value)} className="font-mono bg-background text-xs h-9" />
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs uppercase tracking-wider text-muted-foreground">Warranty Exp.</Label>
-                      <Input type="date" value={editState.warrantyExpiration} onChange={(e) => set("warrantyExpiration")(e.target.value)} className="font-mono bg-background text-xs h-9" />
+                      <Input type="date" value={editState.warrantyExpiration} onChange={(e) => setField("warrantyExpiration")(e.target.value)} className="font-mono bg-background text-xs h-9" />
                     </div>
                   </div>
                   {editState.warrantyExpiration && (() => {
@@ -636,20 +768,15 @@ export default function Assets() {
                 </section>
               </div>
 
-              {/* Footer actions */}
               <div className="px-6 py-4 border-t border-border flex items-center justify-between gap-3">
-                <Button
-                  type="button" variant="ghost" size="sm"
+                <Button type="button" variant="ghost" size="sm"
                   onClick={(e) => handleDelete(editAsset.id, editAsset.name, e)}
-                  className="font-mono text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 gap-1.5"
-                >
+                  className="font-mono text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 gap-1.5">
                   <Trash2 className="h-3.5 w-3.5" /> Decommission
                 </Button>
                 <div className="flex gap-2">
                   <Button type="button" variant="outline" size="sm" onClick={() => setSheetOpen(false)}
-                    className="font-mono text-xs uppercase tracking-wider border-border">
-                    Cancel
-                  </Button>
+                    className="font-mono text-xs uppercase tracking-wider border-border">Cancel</Button>
                   <Button type="submit" size="sm" disabled={updateAsset.isPending}
                     className="font-mono text-xs uppercase tracking-wider gap-1.5">
                     <Save className="h-3.5 w-3.5" />
