@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/select";
 import {
   Plus, Trash2, Search, Filter, X, ChevronDown, ChevronUp,
-  Pencil, Save, AlertTriangle, CheckSquare, Loader2, Tag,
+  Pencil, Save, AlertTriangle, CheckSquare, Loader2, Tag, Download,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -310,6 +310,44 @@ export default function Assets() {
     }
   }, [selectedAssets, queryClient, toast, editAsset, selected]);
 
+  // ── CSV export ────────────────────────────────────────────────────────────
+  const downloadCSV = useCallback(() => {
+    const exportRows = selectedCount > 0 ? selectedAssets : filteredAssets;
+    const scope = selectedCount > 0 ? "selected" : activeFilterCount > 0 ? "filtered" : "all";
+    const date = new Date().toISOString().slice(0, 10);
+    const filename = `dcim-assets-${scope}-${date}.csv`;
+    const headers = [
+      "ID", "Name", "Type", "Status", "Asset Tag", "Serial Number",
+      "Manufacturer", "Model", "Rack", "U Position", "U Height",
+      "Install Date", "Warranty Expiration",
+    ];
+    const esc = (v: string | number | null | undefined): string => {
+      if (v == null) return "";
+      const s = String(v);
+      return s.includes(",") || s.includes('"') || s.includes("\n")
+        ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows = exportRows.map((a) =>
+      [
+        a.id, a.name, a.type, a.status ?? "", a.assetTag ?? "",
+        a.serialNumber ?? "", a.manufacturer ?? "", a.model ?? "",
+        a.rackName ?? `Rack ${a.rackId}`, a.uPosition, a.uHeight,
+        a.installDate ? a.installDate.slice(0, 10) : "",
+        a.warrantyExpiration ? a.warrantyExpiration.slice(0, 10) : "",
+      ].map(esc).join(",")
+    );
+    const csv = [headers.join(","), ...rows].join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url; link.download = filename; link.click();
+    URL.revokeObjectURL(url);
+    toast({
+      title: "Export Ready",
+      description: `${exportRows.length} asset${exportRows.length !== 1 ? "s" : ""} → ${filename}`,
+    });
+  }, [selectedCount, selectedAssets, filteredAssets, activeFilterCount, toast]);
+
   // ── render ────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
@@ -320,12 +358,32 @@ export default function Assets() {
           <h1 className="text-3xl font-bold tracking-tight text-primary">Global Assets</h1>
           <p className="text-muted-foreground text-sm font-mono mt-1 uppercase tracking-widest">HARDWARE INVENTORY</p>
         </div>
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogTrigger asChild>
-            <Button className="font-mono uppercase tracking-wider text-xs">
-              <Plus className="mr-2 h-4 w-4" /> Deploy Asset
-            </Button>
-          </DialogTrigger>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={downloadCSV}
+            disabled={isLoading || !filteredAssets.length}
+            className="font-mono uppercase tracking-wider text-xs border-border bg-card/50 hover:bg-secondary/50 gap-2"
+            title={selectedCount > 0
+              ? `Export ${selectedCount} selected asset${selectedCount !== 1 ? "s" : ""}`
+              : activeFilterCount > 0
+                ? `Export ${filteredAssets.length} filtered asset${filteredAssets.length !== 1 ? "s" : ""}`
+                : `Export all ${filteredAssets.length} assets`}
+          >
+            <Download className="h-4 w-4" />
+            Export
+            {selectedCount > 0 && (
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                {selectedCount}
+              </span>
+            )}
+          </Button>
+          <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <DialogTrigger asChild>
+              <Button className="font-mono uppercase tracking-wider text-xs">
+                <Plus className="mr-2 h-4 w-4" /> Deploy Asset
+              </Button>
+            </DialogTrigger>
           <DialogContent className="sm:max-w-[600px] bg-card border-border max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="font-mono uppercase tracking-widest text-primary">Deploy New Asset</DialogTitle>
@@ -389,7 +447,8 @@ export default function Assets() {
               </div>
             </form>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </div>
 
       {/* Search + Filter toggle */}
