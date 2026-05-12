@@ -21,39 +21,50 @@ public class DataInitializer implements CommandLineRunner {
     private final RoomRepository roomRepository;
     private final RackRepository rackRepository;
     private final AssetRepository assetRepository;
+    private final IncidentRepository incidentRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
     @Transactional
     public void run(String... args) {
-        if (userRepository.count() == 0) {
-            seedUsers();
-        }
+        seedUsers();
         if (siteRepository.count() == 0) {
             seedDemoData();
         }
     }
 
-    private void seedUsers() {
-        log.info("Seeding default users...");
-        AppUser admin = new AppUser();
-        admin.setUsername("admin");
-        admin.setPassword(passwordEncoder.encode("admin123"));
-        admin.setRole("ADMIN");
-        userRepository.save(admin);
+    private void ensureUser(String username, String rawPassword, String role) {
+        userRepository.findByUsername(username).ifPresentOrElse(
+            existing -> {
+                if (!existing.getRole().equals(role)) {
+                    existing.setRole(role);
+                    userRepository.save(existing);
+                    log.info("Updated role for user: {}", username);
+                }
+            },
+            () -> {
+                AppUser user = new AppUser();
+                user.setUsername(username);
+                user.setPassword(passwordEncoder.encode(rawPassword));
+                user.setRole(role);
+                userRepository.save(user);
+                log.info("Created user: {} ({})", username, role);
+            }
+        );
+    }
 
-        AppUser user = new AppUser();
-        user.setUsername("noc");
-        user.setPassword(passwordEncoder.encode("noc123"));
-        user.setRole("USER");
-        userRepository.save(user);
-        log.info("Default users created: admin/admin123, noc/noc123");
+    private void seedUsers() {
+        ensureUser("admin",    "admin123", "ADMIN");
+        ensureUser("engineer", "eng123",   "ENGINEER");
+        ensureUser("viewer",   "view123",  "VIEWER");
+        // Migrate legacy noc/USER → ENGINEER
+        ensureUser("noc",      "noc123",   "ENGINEER");
     }
 
     private void seedDemoData() {
         log.info("Seeding demo data...");
 
-        // Site 1
+        // Sites
         Site site1 = new Site();
         site1.setName("NYC-DC1");
         site1.setAddress("123 Broadway");
@@ -61,7 +72,6 @@ public class DataInitializer implements CommandLineRunner {
         site1.setCountry("USA");
         site1 = siteRepository.save(site1);
 
-        // Site 2
         Site site2 = new Site();
         site2.setName("LAX-DC2");
         site2.setAddress("456 Sunset Blvd");
@@ -118,7 +128,7 @@ public class DataInitializer implements CommandLineRunner {
         rack4 = rackRepository.save(rack4);
 
         // Assets in rack1
-        createAsset("web-srv-01", Asset.AssetType.SERVER, "Dell", "PowerEdge R750", "SN-WEB01", "TAG-001",
+        Asset a1 = createAsset("web-srv-01", Asset.AssetType.SERVER, "Dell", "PowerEdge R750", "SN-WEB01", "TAG-001",
                 rack1, 40, 2, Asset.AssetStatus.ACTIVE,
                 LocalDate.of(2022, 3, 15), LocalDate.of(2025, 3, 15));
 
@@ -143,11 +153,11 @@ public class DataInitializer implements CommandLineRunner {
                 rack2, 35, 4, Asset.AssetStatus.ACTIVE,
                 LocalDate.of(2022, 8, 20), LocalDate.now().plusDays(45));
 
-        createAsset("backup-srv-01", Asset.AssetType.SERVER, "HP", "ProLiant DL360 Gen10", "SN-BKP01", "TAG-007",
+        Asset bkp = createAsset("backup-srv-01", Asset.AssetType.SERVER, "HP", "ProLiant DL360 Gen10", "SN-BKP01", "TAG-007",
                 rack2, 30, 1, Asset.AssetStatus.MAINTENANCE,
                 LocalDate.of(2020, 5, 1), LocalDate.now().plusDays(20));
 
-        // Assets in rack3 (network)
+        // Assets in rack3
         createAsset("core-sw-01", Asset.AssetType.SWITCH, "Cisco", "Nexus 9336C-FX2", "SN-SW01", "TAG-008",
                 rack3, 42, 1, Asset.AssetStatus.ACTIVE,
                 LocalDate.of(2022, 11, 1), LocalDate.of(2027, 11, 1));
@@ -160,7 +170,7 @@ public class DataInitializer implements CommandLineRunner {
                 rack3, 38, 1, Asset.AssetStatus.ACTIVE,
                 LocalDate.of(2023, 3, 1), LocalDate.now().plusDays(60));
 
-        // Assets in rack4 (LAX)
+        // Assets in rack4
         createAsset("lax-srv-01", Asset.AssetType.SERVER, "Dell", "PowerEdge R640", "SN-LAX01", "TAG-011",
                 rack4, 46, 2, Asset.AssetStatus.ACTIVE,
                 LocalDate.of(2023, 7, 1), LocalDate.of(2026, 7, 1));
@@ -169,10 +179,47 @@ public class DataInitializer implements CommandLineRunner {
                 rack4, 44, 1, Asset.AssetStatus.INACTIVE,
                 LocalDate.of(2021, 2, 1), LocalDate.of(2024, 2, 1));
 
+        // Seed demo incidents
+        seedIncidents(a1, bkp);
+
         log.info("Demo data seeded successfully.");
     }
 
-    private void createAsset(String name, Asset.AssetType type, String manufacturer, String model,
+    private void seedIncidents(Asset a1, Asset bkp) {
+        if (incidentRepository.count() > 0) return;
+
+        Incident i1 = new Incident();
+        i1.setTitle("web-srv-01 intermittent packet loss");
+        i1.setDescription("NOC reports ~2% packet loss on eth0 since 02:00 UTC. Possible NIC or upstream switch issue.");
+        i1.setSeverity(Incident.Severity.HIGH);
+        i1.setStatus(Incident.Status.IN_PROGRESS);
+        i1.setAsset(a1);
+        i1.setAssignedTo("engineer");
+        i1.setCreatedBy("admin");
+        incidentRepository.save(i1);
+
+        Incident i2 = new Incident();
+        i2.setTitle("backup-srv-01 fan alarm");
+        i2.setDescription("IPMI reports fan speed out of range. Unit is in MAINTENANCE. Physical inspection required.");
+        i2.setSeverity(Incident.Severity.MEDIUM);
+        i2.setStatus(Incident.Status.OPEN);
+        i2.setAsset(bkp);
+        i2.setAssignedTo(null);
+        i2.setCreatedBy("noc");
+        incidentRepository.save(i2);
+
+        Incident i3 = new Incident();
+        i3.setTitle("NYC-DC1 cooling anomaly resolved");
+        i3.setDescription("Temperature spike in Server Room A tracked to blocked floor tile. Tile repositioned, temps nominal.");
+        i3.setSeverity(Incident.Severity.LOW);
+        i3.setStatus(Incident.Status.RESOLVED);
+        i3.setAsset(null);
+        i3.setAssignedTo("engineer");
+        i3.setCreatedBy("engineer");
+        incidentRepository.save(i3);
+    }
+
+    private Asset createAsset(String name, Asset.AssetType type, String manufacturer, String model,
                               String serial, String tag, Rack rack, int uPos, int uHeight,
                               Asset.AssetStatus status, LocalDate installDate, LocalDate warrantyExp) {
         Asset asset = new Asset();
@@ -188,6 +235,6 @@ public class DataInitializer implements CommandLineRunner {
         asset.setStatus(status);
         asset.setInstallDate(installDate);
         asset.setWarrantyExpiration(warrantyExp);
-        assetRepository.save(asset);
+        return assetRepository.save(asset);
     }
 }

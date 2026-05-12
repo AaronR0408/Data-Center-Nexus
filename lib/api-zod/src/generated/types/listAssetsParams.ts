@@ -7,12 +7,6 @@
  */
 
 export type ListAssetsParams = {
-  /**
-   * @nullable
-   */
-  rackId?: number | null;
-  /**
-   * @nullable
-   */
-  type?: string | null;
+  rackId?: number;
+  type?: string;
 };

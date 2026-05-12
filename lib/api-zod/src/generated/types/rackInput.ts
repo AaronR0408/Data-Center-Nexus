@@ -9,6 +9,7 @@
 export interface RackInput {
   /** @minLength 1 */
   name: string;
-  totalU?: number;
+  roomId: number;
+  totalU: number;
   description?: string;
 }

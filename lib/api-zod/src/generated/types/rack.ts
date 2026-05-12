@@ -12,10 +12,10 @@ export interface Rack {
   roomId: number;
   /** @nullable */
   roomName?: string | null;
+  /** @nullable */
+  siteName?: string | null;
   totalU: number;
   usedU?: number;
   /** @nullable */
   description?: string | null;
-  /** @nullable */
-  createdAt?: string | null;
 }

@@ -11,8 +11,9 @@ export interface Site {
   name: string;
   /** @nullable */
   address?: string | null;
-  city: string;
-  country: string;
   /** @nullable */
-  createdAt?: string | null;
+  city?: string | null;
+  /** @nullable */
+  country?: string | null;
+  roomCount?: number;
 }

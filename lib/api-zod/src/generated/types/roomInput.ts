@@ -10,4 +10,5 @@ export interface RoomInput {
   /** @minLength 1 */
   name: string;
   floor?: string;
+  siteId: number;
 }

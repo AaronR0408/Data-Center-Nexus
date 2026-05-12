@@ -14,6 +14,5 @@ export interface Room {
   siteId: number;
   /** @nullable */
   siteName?: string | null;
-  /** @nullable */
-  createdAt?: string | null;
+  rackCount?: number;
 }

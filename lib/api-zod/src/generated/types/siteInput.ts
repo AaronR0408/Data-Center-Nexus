@@ -10,8 +10,6 @@ export interface SiteInput {
   /** @minLength 1 */
   name: string;
   address?: string;
-  /** @minLength 1 */
-  city: string;
-  /** @minLength 1 */
-  country: string;
+  city?: string;
+  country?: string;
 }

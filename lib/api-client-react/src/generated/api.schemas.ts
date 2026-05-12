@@ -9,25 +9,39 @@ export interface HealthStatus {
   status: string;
 }
 
+export type CurrentUserRole =
+  (typeof CurrentUserRole)[keyof typeof CurrentUserRole];
+
+export const CurrentUserRole = {
+  ADMIN: "ADMIN",
+  ENGINEER: "ENGINEER",
+  VIEWER: "VIEWER",
+} as const;
+
+export interface CurrentUser {
+  id: number;
+  username: string;
+  role: CurrentUserRole;
+}
+
 export interface Site {
   id: number;
   name: string;
   /** @nullable */
   address?: string | null;
-  city: string;
-  country: string;
   /** @nullable */
-  createdAt?: string | null;
+  city?: string | null;
+  /** @nullable */
+  country?: string | null;
+  roomCount?: number;
 }
 
 export interface SiteInput {
   /** @minLength 1 */
   name: string;
   address?: string;
-  /** @minLength 1 */
-  city: string;
-  /** @minLength 1 */
-  country: string;
+  city?: string;
+  country?: string;
 }
 
 export interface Room {
@@ -38,14 +52,14 @@ export interface Room {
   siteId: number;
   /** @nullable */
   siteName?: string | null;
-  /** @nullable */
-  createdAt?: string | null;
+  rackCount?: number;
 }
 
 export interface RoomInput {
   /** @minLength 1 */
   name: string;
   floor?: string;
+  siteId: number;
 }
 
 export interface Rack {
@@ -54,19 +68,38 @@ export interface Rack {
   roomId: number;
   /** @nullable */
   roomName?: string | null;
+  /** @nullable */
+  siteName?: string | null;
   totalU: number;
   usedU?: number;
   /** @nullable */
   description?: string | null;
-  /** @nullable */
-  createdAt?: string | null;
 }
 
 export interface RackInput {
   /** @minLength 1 */
   name: string;
-  totalU?: number;
+  roomId: number;
+  totalU: number;
   description?: string;
+}
+
+export interface RackSlot {
+  u: number;
+  isEmpty: boolean;
+  /** @nullable */
+  assetId?: number | null;
+  /** @nullable */
+  assetName?: string | null;
+  /** @nullable */
+  assetType?: string | null;
+  /** @nullable */
+  uStart?: number | null;
+  /** @nullable */
+  uHeight?: number | null;
+  isTop?: boolean;
+  /** @nullable */
+  status?: string | null;
 }
 
 export type AssetType = (typeof AssetType)[keyof typeof AssetType];
@@ -114,17 +147,6 @@ export interface Asset {
   createdAt?: string | null;
 }
 
-export interface RackSlot {
-  uPosition: number;
-  occupied: boolean;
-  asset?: Asset;
-}
-
-export interface RackView {
-  rack: Rack;
-  slots: RackSlot[];
-}
-
 export type AssetInputType =
   (typeof AssetInputType)[keyof typeof AssetInputType];
 
@@ -162,6 +184,106 @@ export interface AssetInput {
   warrantyExpiration?: string;
 }
 
+export type IncidentSeverity =
+  (typeof IncidentSeverity)[keyof typeof IncidentSeverity];
+
+export const IncidentSeverity = {
+  LOW: "LOW",
+  MEDIUM: "MEDIUM",
+  HIGH: "HIGH",
+  CRITICAL: "CRITICAL",
+} as const;
+
+export type IncidentStatus =
+  (typeof IncidentStatus)[keyof typeof IncidentStatus];
+
+export const IncidentStatus = {
+  OPEN: "OPEN",
+  IN_PROGRESS: "IN_PROGRESS",
+  RESOLVED: "RESOLVED",
+} as const;
+
+export interface Incident {
+  id: number;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  severity: IncidentSeverity;
+  status: IncidentStatus;
+  /** @nullable */
+  assetId?: number | null;
+  /** @nullable */
+  assetName?: string | null;
+  /** @nullable */
+  assignedTo?: string | null;
+  /** @nullable */
+  createdBy?: string | null;
+  /** @nullable */
+  createdAt?: string | null;
+  /** @nullable */
+  updatedAt?: string | null;
+  /** @nullable */
+  resolvedAt?: string | null;
+}
+
+export type IncidentInputSeverity =
+  (typeof IncidentInputSeverity)[keyof typeof IncidentInputSeverity];
+
+export const IncidentInputSeverity = {
+  LOW: "LOW",
+  MEDIUM: "MEDIUM",
+  HIGH: "HIGH",
+  CRITICAL: "CRITICAL",
+} as const;
+
+export type IncidentInputStatus =
+  (typeof IncidentInputStatus)[keyof typeof IncidentInputStatus];
+
+export const IncidentInputStatus = {
+  OPEN: "OPEN",
+  IN_PROGRESS: "IN_PROGRESS",
+  RESOLVED: "RESOLVED",
+} as const;
+
+export interface IncidentInput {
+  /** @minLength 1 */
+  title: string;
+  description?: string;
+  severity?: IncidentInputSeverity;
+  status?: IncidentInputStatus;
+  assetId?: number;
+  assignedTo?: string;
+}
+
+export type UserRole = (typeof UserRole)[keyof typeof UserRole];
+
+export const UserRole = {
+  ADMIN: "ADMIN",
+  ENGINEER: "ENGINEER",
+  VIEWER: "VIEWER",
+} as const;
+
+export interface User {
+  id: number;
+  username: string;
+  role: UserRole;
+}
+
+export type UserInputRole = (typeof UserInputRole)[keyof typeof UserInputRole];
+
+export const UserInputRole = {
+  ADMIN: "ADMIN",
+  ENGINEER: "ENGINEER",
+  VIEWER: "VIEWER",
+} as const;
+
+export interface UserInput {
+  /** @minLength 1 */
+  username: string;
+  password?: string;
+  role: UserInputRole;
+}
+
 export interface RackUtilization {
   rackId: number;
   rackName: string;
@@ -191,13 +313,28 @@ export interface DashboardSummary {
   assetsByType?: AssetTypeCount[];
 }
 
-export type ListAssetsParams = {
-  /**
-   * @nullable
-   */
-  rackId?: number | null;
-  /**
-   * @nullable
-   */
-  type?: string | null;
+export type ListRoomsParams = {
+  siteId?: number;
 };
+
+export type ListRacksParams = {
+  roomId?: number;
+};
+
+export type ListAssetsParams = {
+  rackId?: number;
+  type?: string;
+};
+
+export type ListIncidentsParams = {
+  status?: ListIncidentsStatus;
+};
+
+export type ListIncidentsStatus =
+  (typeof ListIncidentsStatus)[keyof typeof ListIncidentsStatus];
+
+export const ListIncidentsStatus = {
+  OPEN: "OPEN",
+  IN_PROGRESS: "IN_PROGRESS",
+  RESOLVED: "RESOLVED",
+} as const;

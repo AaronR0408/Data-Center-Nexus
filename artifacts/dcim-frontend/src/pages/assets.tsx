@@ -37,6 +37,7 @@ import {
   Pencil, Save, AlertTriangle, CheckSquare, Loader2, Tag, Download,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/auth-context";
 
 // ── colour maps ───────────────────────────────────────────────────────────────
 const TYPE_COLORS: Record<string, string> = {
@@ -80,6 +81,7 @@ export default function Assets() {
   const { data: assets, isLoading } = useListAssets();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { canWrite } = useAuth();
 
   // filter
   const [showFilters, setShowFilters] = useState(false);
@@ -378,6 +380,7 @@ export default function Assets() {
               </span>
             )}
           </Button>
+          {canWrite && (
           <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
               <Button className="font-mono uppercase tracking-wider text-xs">
@@ -448,6 +451,7 @@ export default function Assets() {
             </form>
           </DialogContent>
           </Dialog>
+          )}
         </div>
       </div>
 
@@ -551,7 +555,7 @@ export default function Assets() {
       )}
 
       {/* ── Bulk-action toolbar ──────────────────────────────────── */}
-      {selectedCount > 0 && (
+      {canWrite && selectedCount > 0 && (
         <div className="flex items-center gap-3 rounded-md border border-primary/30 bg-primary/5 px-4 py-2.5 animate-in slide-in-from-top-1 duration-150">
           {/* Count + deselect */}
           <div className="flex items-center gap-2 flex-1">
@@ -656,9 +660,9 @@ export default function Assets() {
                 return (
                   <TableRow
                     key={asset.id}
-                    onClick={(e) => openEdit(asset, e)}
+                    onClick={(e) => canWrite && openEdit(asset, e)}
                     data-selected={isSelected}
-                    className="border-border transition-colors hover:bg-secondary/20 group cursor-pointer data-[selected=true]:bg-primary/5 data-[selected=true]:border-l-2 data-[selected=true]:border-l-primary"
+                    className={`border-border transition-colors hover:bg-secondary/20 group data-[selected=true]:bg-primary/5 data-[selected=true]:border-l-2 data-[selected=true]:border-l-primary ${canWrite ? "cursor-pointer" : ""}`}
                   >
                     {/* Row checkbox */}
                     <TableCell className="w-10 pl-4" onClick={(e) => e.stopPropagation()}>
@@ -699,6 +703,7 @@ export default function Assets() {
                       {!asset.warrantyExpiration && <span className="text-[10px] font-mono text-muted-foreground opacity-40">—</span>}
                     </TableCell>
                     <TableCell className="text-right">
+                      {canWrite && (
                       <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button variant="ghost" size="icon" onClick={(e) => openEdit(asset, e)}
                           className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10">
@@ -709,6 +714,7 @@ export default function Assets() {
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 );

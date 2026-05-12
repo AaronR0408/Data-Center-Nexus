@@ -36,12 +36,39 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                // Public
                 .requestMatchers("/api/healthz").permitAll()
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/**").hasAnyRole("USER", "ADMIN")
-                .requestMatchers(HttpMethod.POST, "/api/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PUT, "/api/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/api/**").hasRole("ADMIN")
+
+                // Current user identity — all authenticated
+                .requestMatchers("/api/auth/me").authenticated()
+
+                // User management — ADMIN only
+                .requestMatchers("/api/users/**").hasRole("ADMIN")
+
+                // Incident reads — ADMIN and ENGINEER (VIEWER excluded)
+                .requestMatchers(HttpMethod.GET, "/api/incidents/**").hasAnyRole("ADMIN", "ENGINEER")
+                // Incident writes — ADMIN and ENGINEER
+                .requestMatchers(HttpMethod.POST, "/api/incidents/**").hasAnyRole("ADMIN", "ENGINEER")
+                .requestMatchers(HttpMethod.PUT, "/api/incidents/**").hasAnyRole("ADMIN", "ENGINEER")
+                // Incident delete — ADMIN only
+                .requestMatchers(HttpMethod.DELETE, "/api/incidents/**").hasRole("ADMIN")
+
+                // Asset reads — all authenticated roles
+                .requestMatchers(HttpMethod.GET, "/api/assets/**").hasAnyRole("ADMIN", "ENGINEER", "VIEWER")
+                // Asset writes — ADMIN only
+                .requestMatchers(HttpMethod.POST, "/api/assets/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/assets/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/assets/**").hasRole("ADMIN")
+
+                // Infrastructure reads — all roles
+                .requestMatchers(HttpMethod.GET, "/api/sites/**", "/api/rooms/**", "/api/racks/**",
+                                 "/api/dashboard/**", "/api/warranty/**").hasAnyRole("ADMIN", "ENGINEER", "VIEWER")
+                // Infrastructure writes — ADMIN only
+                .requestMatchers(HttpMethod.POST, "/api/sites/**", "/api/rooms/**", "/api/racks/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/sites/**", "/api/rooms/**", "/api/racks/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/sites/**", "/api/rooms/**", "/api/racks/**").hasRole("ADMIN")
+
                 .anyRequest().authenticated()
             )
             .httpBasic(basic -> {});

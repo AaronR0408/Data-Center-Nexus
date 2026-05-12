@@ -15,15 +15,24 @@ export const HealthCheckResponse = zod.object({
 });
 
 /**
+ * @summary Get current authenticated user
+ */
+export const GetCurrentUserResponse = zod.object({
+  id: zod.number(),
+  username: zod.string(),
+  role: zod.enum(["ADMIN", "ENGINEER", "VIEWER"]),
+});
+
+/**
  * @summary List all sites
  */
 export const ListSitesResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
   address: zod.string().nullish(),
-  city: zod.string(),
-  country: zod.string(),
-  createdAt: zod.string().nullish(),
+  city: zod.string().nullish(),
+  country: zod.string().nullish(),
+  roomCount: zod.number().optional(),
 });
 export const ListSitesResponse = zod.array(ListSitesResponseItem);
 
@@ -34,8 +43,8 @@ export const ListSitesResponse = zod.array(ListSitesResponseItem);
 export const CreateSiteBody = zod.object({
   name: zod.string().min(1),
   address: zod.string().optional(),
-  city: zod.string().min(1),
-  country: zod.string().min(1),
+  city: zod.string().optional(),
+  country: zod.string().optional(),
 });
 
 /**
@@ -49,9 +58,9 @@ export const GetSiteResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
   address: zod.string().nullish(),
-  city: zod.string(),
-  country: zod.string(),
-  createdAt: zod.string().nullish(),
+  city: zod.string().nullish(),
+  country: zod.string().nullish(),
+  roomCount: zod.number().optional(),
 });
 
 /**
@@ -64,17 +73,17 @@ export const UpdateSiteParams = zod.object({
 export const UpdateSiteBody = zod.object({
   name: zod.string().min(1),
   address: zod.string().optional(),
-  city: zod.string().min(1),
-  country: zod.string().min(1),
+  city: zod.string().optional(),
+  country: zod.string().optional(),
 });
 
 export const UpdateSiteResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
   address: zod.string().nullish(),
-  city: zod.string(),
-  country: zod.string(),
-  createdAt: zod.string().nullish(),
+  city: zod.string().nullish(),
+  country: zod.string().nullish(),
+  roomCount: zod.number().optional(),
 });
 
 /**
@@ -85,10 +94,10 @@ export const DeleteSiteParams = zod.object({
 });
 
 /**
- * @summary List rooms for a site
+ * @summary List rooms, optionally filtered by site
  */
-export const ListRoomsParams = zod.object({
-  siteId: zod.coerce.number(),
+export const ListRoomsQueryParams = zod.object({
+  siteId: zod.coerce.number().optional(),
 });
 
 export const ListRoomsResponseItem = zod.object({
@@ -97,20 +106,18 @@ export const ListRoomsResponseItem = zod.object({
   floor: zod.string().nullish(),
   siteId: zod.number(),
   siteName: zod.string().nullish(),
-  createdAt: zod.string().nullish(),
+  rackCount: zod.number().optional(),
 });
 export const ListRoomsResponse = zod.array(ListRoomsResponseItem);
 
 /**
- * @summary Create a room within a site
+ * @summary Create a new room
  */
-export const CreateRoomParams = zod.object({
-  siteId: zod.coerce.number(),
-});
 
 export const CreateRoomBody = zod.object({
   name: zod.string().min(1),
   floor: zod.string().optional(),
+  siteId: zod.number(),
 });
 
 /**
@@ -126,7 +133,7 @@ export const GetRoomResponse = zod.object({
   floor: zod.string().nullish(),
   siteId: zod.number(),
   siteName: zod.string().nullish(),
-  createdAt: zod.string().nullish(),
+  rackCount: zod.number().optional(),
 });
 
 /**
@@ -139,6 +146,7 @@ export const UpdateRoomParams = zod.object({
 export const UpdateRoomBody = zod.object({
   name: zod.string().min(1),
   floor: zod.string().optional(),
+  siteId: zod.number(),
 });
 
 export const UpdateRoomResponse = zod.object({
@@ -147,7 +155,7 @@ export const UpdateRoomResponse = zod.object({
   floor: zod.string().nullish(),
   siteId: zod.number(),
   siteName: zod.string().nullish(),
-  createdAt: zod.string().nullish(),
+  rackCount: zod.number().optional(),
 });
 
 /**
@@ -158,10 +166,10 @@ export const DeleteRoomParams = zod.object({
 });
 
 /**
- * @summary List racks for a room
+ * @summary List racks, optionally filtered by room
  */
-export const ListRacksParams = zod.object({
-  roomId: zod.coerce.number(),
+export const ListRacksQueryParams = zod.object({
+  roomId: zod.coerce.number().optional(),
 });
 
 export const ListRacksResponseItem = zod.object({
@@ -169,25 +177,21 @@ export const ListRacksResponseItem = zod.object({
   name: zod.string(),
   roomId: zod.number(),
   roomName: zod.string().nullish(),
+  siteName: zod.string().nullish(),
   totalU: zod.number(),
   usedU: zod.number().optional(),
   description: zod.string().nullish(),
-  createdAt: zod.string().nullish(),
 });
 export const ListRacksResponse = zod.array(ListRacksResponseItem);
 
 /**
- * @summary Create a rack within a room
+ * @summary Create a new rack
  */
-export const CreateRackParams = zod.object({
-  roomId: zod.coerce.number(),
-});
-
-export const createRackBodyTotalUDefault = 42;
 
 export const CreateRackBody = zod.object({
   name: zod.string().min(1),
-  totalU: zod.number().default(createRackBodyTotalUDefault),
+  roomId: zod.number(),
+  totalU: zod.number(),
   description: zod.string().optional(),
 });
 
@@ -203,10 +207,10 @@ export const GetRackResponse = zod.object({
   name: zod.string(),
   roomId: zod.number(),
   roomName: zod.string().nullish(),
+  siteName: zod.string().nullish(),
   totalU: zod.number(),
   usedU: zod.number().optional(),
   description: zod.string().nullish(),
-  createdAt: zod.string().nullish(),
 });
 
 /**
@@ -216,11 +220,10 @@ export const UpdateRackParams = zod.object({
   id: zod.coerce.number(),
 });
 
-export const updateRackBodyTotalUDefault = 42;
-
 export const UpdateRackBody = zod.object({
   name: zod.string().min(1),
-  totalU: zod.number().default(updateRackBodyTotalUDefault),
+  roomId: zod.number(),
+  totalU: zod.number(),
   description: zod.string().optional(),
 });
 
@@ -229,10 +232,10 @@ export const UpdateRackResponse = zod.object({
   name: zod.string(),
   roomId: zod.number(),
   roomName: zod.string().nullish(),
+  siteName: zod.string().nullish(),
   totalU: zod.number(),
   usedU: zod.number().optional(),
   description: zod.string().nullish(),
-  createdAt: zod.string().nullish(),
 });
 
 /**
@@ -243,63 +246,31 @@ export const DeleteRackParams = zod.object({
 });
 
 /**
- * @summary Get visual rack view showing all U positions
+ * @summary Get rack slot layout
  */
-export const GetRackViewParams = zod.object({
+export const GetRackSlotsParams = zod.object({
   id: zod.coerce.number(),
 });
 
-export const GetRackViewResponse = zod.object({
-  rack: zod.object({
-    id: zod.number(),
-    name: zod.string(),
-    roomId: zod.number(),
-    roomName: zod.string().nullish(),
-    totalU: zod.number(),
-    usedU: zod.number().optional(),
-    description: zod.string().nullish(),
-    createdAt: zod.string().nullish(),
-  }),
-  slots: zod.array(
-    zod.object({
-      uPosition: zod.number(),
-      occupied: zod.boolean(),
-      asset: zod
-        .object({
-          id: zod.number(),
-          name: zod.string(),
-          type: zod.enum([
-            "SERVER",
-            "SWITCH",
-            "PDU",
-            "UPS",
-            "STORAGE",
-            "OTHER",
-          ]),
-          manufacturer: zod.string().nullish(),
-          model: zod.string().nullish(),
-          serialNumber: zod.string().nullish(),
-          assetTag: zod.string().nullish(),
-          rackId: zod.number(),
-          rackName: zod.string().nullish(),
-          uPosition: zod.number(),
-          uHeight: zod.number(),
-          status: zod.enum(["ACTIVE", "INACTIVE", "MAINTENANCE"]).optional(),
-          installDate: zod.string().nullish(),
-          warrantyExpiration: zod.string().nullish(),
-          createdAt: zod.string().nullish(),
-        })
-        .optional(),
-    }),
-  ),
+export const GetRackSlotsResponseItem = zod.object({
+  u: zod.number(),
+  isEmpty: zod.boolean(),
+  assetId: zod.number().nullish(),
+  assetName: zod.string().nullish(),
+  assetType: zod.string().nullish(),
+  uStart: zod.number().nullish(),
+  uHeight: zod.number().nullish(),
+  isTop: zod.boolean().optional(),
+  status: zod.string().nullish(),
 });
+export const GetRackSlotsResponse = zod.array(GetRackSlotsResponseItem);
 
 /**
- * @summary List all assets
+ * @summary List assets
  */
 export const ListAssetsQueryParams = zod.object({
-  rackId: zod.coerce.number().nullish(),
-  type: zod.coerce.string().nullish(),
+  rackId: zod.coerce.number().optional(),
+  type: zod.coerce.string().optional(),
 });
 
 export const ListAssetsResponseItem = zod.object({
@@ -322,7 +293,7 @@ export const ListAssetsResponseItem = zod.object({
 export const ListAssetsResponse = zod.array(ListAssetsResponseItem);
 
 /**
- * @summary Create an asset and assign it to a rack slot
+ * @summary Create a new asset
  */
 
 export const createAssetBodyStatusDefault = `ACTIVE`;
@@ -421,7 +392,176 @@ export const DeleteAssetParams = zod.object({
 });
 
 /**
- * @summary Get overall dashboard statistics
+ * @summary List incidents
+ */
+export const ListIncidentsQueryParams = zod.object({
+  status: zod.enum(["OPEN", "IN_PROGRESS", "RESOLVED"]).optional(),
+});
+
+export const ListIncidentsResponseItem = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  severity: zod.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]),
+  status: zod.enum(["OPEN", "IN_PROGRESS", "RESOLVED"]),
+  assetId: zod.number().nullish(),
+  assetName: zod.string().nullish(),
+  assignedTo: zod.string().nullish(),
+  createdBy: zod.string().nullish(),
+  createdAt: zod.string().nullish(),
+  updatedAt: zod.string().nullish(),
+  resolvedAt: zod.string().nullish(),
+});
+export const ListIncidentsResponse = zod.array(ListIncidentsResponseItem);
+
+/**
+ * @summary Create a new incident
+ */
+
+export const createIncidentBodySeverityDefault = `MEDIUM`;
+export const createIncidentBodyStatusDefault = `OPEN`;
+
+export const CreateIncidentBody = zod.object({
+  title: zod.string().min(1),
+  description: zod.string().optional(),
+  severity: zod
+    .enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
+    .default(createIncidentBodySeverityDefault),
+  status: zod
+    .enum(["OPEN", "IN_PROGRESS", "RESOLVED"])
+    .default(createIncidentBodyStatusDefault),
+  assetId: zod.number().optional(),
+  assignedTo: zod.string().optional(),
+});
+
+/**
+ * @summary Get an incident by ID
+ */
+export const GetIncidentParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetIncidentResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  severity: zod.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]),
+  status: zod.enum(["OPEN", "IN_PROGRESS", "RESOLVED"]),
+  assetId: zod.number().nullish(),
+  assetName: zod.string().nullish(),
+  assignedTo: zod.string().nullish(),
+  createdBy: zod.string().nullish(),
+  createdAt: zod.string().nullish(),
+  updatedAt: zod.string().nullish(),
+  resolvedAt: zod.string().nullish(),
+});
+
+/**
+ * @summary Update an incident
+ */
+export const UpdateIncidentParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const updateIncidentBodySeverityDefault = `MEDIUM`;
+export const updateIncidentBodyStatusDefault = `OPEN`;
+
+export const UpdateIncidentBody = zod.object({
+  title: zod.string().min(1),
+  description: zod.string().optional(),
+  severity: zod
+    .enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
+    .default(updateIncidentBodySeverityDefault),
+  status: zod
+    .enum(["OPEN", "IN_PROGRESS", "RESOLVED"])
+    .default(updateIncidentBodyStatusDefault),
+  assetId: zod.number().optional(),
+  assignedTo: zod.string().optional(),
+});
+
+export const UpdateIncidentResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  severity: zod.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]),
+  status: zod.enum(["OPEN", "IN_PROGRESS", "RESOLVED"]),
+  assetId: zod.number().nullish(),
+  assetName: zod.string().nullish(),
+  assignedTo: zod.string().nullish(),
+  createdBy: zod.string().nullish(),
+  createdAt: zod.string().nullish(),
+  updatedAt: zod.string().nullish(),
+  resolvedAt: zod.string().nullish(),
+});
+
+/**
+ * @summary Delete an incident
+ */
+export const DeleteIncidentParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary List all users (ADMIN only)
+ */
+export const ListUsersResponseItem = zod.object({
+  id: zod.number(),
+  username: zod.string(),
+  role: zod.enum(["ADMIN", "ENGINEER", "VIEWER"]),
+});
+export const ListUsersResponse = zod.array(ListUsersResponseItem);
+
+/**
+ * @summary Create a new user (ADMIN only)
+ */
+
+export const CreateUserBody = zod.object({
+  username: zod.string().min(1),
+  password: zod.string().optional(),
+  role: zod.enum(["ADMIN", "ENGINEER", "VIEWER"]),
+});
+
+/**
+ * @summary Get a user by ID (ADMIN only)
+ */
+export const GetUserParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetUserResponse = zod.object({
+  id: zod.number(),
+  username: zod.string(),
+  role: zod.enum(["ADMIN", "ENGINEER", "VIEWER"]),
+});
+
+/**
+ * @summary Update a user (ADMIN only)
+ */
+export const UpdateUserParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateUserBody = zod.object({
+  username: zod.string().min(1),
+  password: zod.string().optional(),
+  role: zod.enum(["ADMIN", "ENGINEER", "VIEWER"]),
+});
+
+export const UpdateUserResponse = zod.object({
+  id: zod.number(),
+  username: zod.string(),
+  role: zod.enum(["ADMIN", "ENGINEER", "VIEWER"]),
+});
+
+/**
+ * @summary Delete a user (ADMIN only)
+ */
+export const DeleteUserParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary Get dashboard summary
  */
 export const GetDashboardResponse = zod.object({
   totalAssets: zod.number(),

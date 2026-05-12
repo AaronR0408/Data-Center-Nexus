@@ -5,10 +5,7 @@
  * Data Center Asset Management System API
  * OpenAPI spec version: 0.1.0
  */
-import type { Rack } from "./rack";
-import type { RackSlot } from "./rackSlot";
 
-export interface RackView {
-  rack: Rack;
-  slots: RackSlot[];
-}
+export type ListRoomsParams = {
+  siteId?: number;
+};

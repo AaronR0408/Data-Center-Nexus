@@ -3,6 +3,7 @@ import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider } from "@/context/auth-context";
 import NotFound from "@/pages/not-found";
 import { Layout } from "@/components/layout";
 
@@ -14,6 +15,8 @@ import Racks from "@/pages/racks";
 import RackView from "@/pages/rack-view";
 import Assets from "@/pages/assets";
 import Warranty from "@/pages/warranty";
+import Incidents from "@/pages/incidents";
+import Users from "@/pages/users";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -35,6 +38,8 @@ function Router() {
         <Route path="/racks/:rackId/view" component={RackView} />
         <Route path="/assets" component={Assets} />
         <Route path="/warranty" component={Warranty} />
+        <Route path="/incidents" component={Incidents} />
+        <Route path="/users" component={Users} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
@@ -46,7 +51,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
+          <AuthProvider>
+            <Router />
+          </AuthProvider>
         </WouterRouter>
         <Toaster />
       </TooltipProvider>

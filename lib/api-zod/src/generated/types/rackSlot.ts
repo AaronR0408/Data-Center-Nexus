@@ -5,10 +5,21 @@
  * Data Center Asset Management System API
  * OpenAPI spec version: 0.1.0
  */
-import type { Asset } from "./asset";
 
 export interface RackSlot {
-  uPosition: number;
-  occupied: boolean;
-  asset?: Asset;
+  u: number;
+  isEmpty: boolean;
+  /** @nullable */
+  assetId?: number | null;
+  /** @nullable */
+  assetName?: string | null;
+  /** @nullable */
+  assetType?: string | null;
+  /** @nullable */
+  uStart?: number | null;
+  /** @nullable */
+  uHeight?: number | null;
+  isTop?: boolean;
+  /** @nullable */
+  status?: string | null;
 }
