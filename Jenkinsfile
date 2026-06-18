@@ -1,15 +1,6 @@
 pipeline {
     agent any
 
-    tools {
-        nodejs 'NodeJS-22'
-    }
-
-    environment {
-        PNPM_HOME = "${WORKSPACE}/.pnpm"
-        PATH = "${PNPM_HOME}:${env.PATH}"
-    }
-
     stages {
 
         stage('Checkout') {
@@ -18,11 +9,12 @@ pipeline {
             }
         }
 
-        stage('Install PNPM') {
+        stage('Verify Environment') {
             steps {
                 sh '''
-                npm install -g pnpm
-                pnpm --version
+                node -v
+                npm -v
+                pnpm -v
                 '''
             }
         }
@@ -53,14 +45,8 @@ pipeline {
 
         stage('Deploy') {
             steps {
-                echo 'Deployment Stage Completed'
+                echo 'Deployment completed'
             }
-        }
-    }
-
-    post {
-        always {
-            cleanWs()
         }
     }
 }
