@@ -19,6 +19,13 @@ pipeline {
             }
         }
 
+        stage('PNPM Debug') {
+    steps {
+        sh '''
+        pnpm config list
+        '''
+    }
+}
      stage('Install Dependencies') {
     steps {
         sh '''
