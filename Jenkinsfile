@@ -88,7 +88,7 @@ stage('Docker Build and Push') {
             passwordVariable: 'DOCKER_PASS'
         )]) {
             sh '''
-            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+            printf "%s" "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
 
             docker build -t $DOCKER_USER/data-center-nexus:latest .
             docker tag $DOCKER_USER/data-center-nexus:latest $DOCKER_USER/data-center-nexus:${GIT_COMMIT}
