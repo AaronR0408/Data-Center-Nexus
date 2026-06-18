@@ -19,13 +19,14 @@ pipeline {
             }
         }
 
-        stage('Install Dependencies') {
-            steps {
-                sh '''
-                pnpm install --no-frozen-lockfile
-                '''
-            }
-        }
+      stage('Install Dependencies') {
+    steps {
+        sh '''
+        pnpm install --no-frozen-lockfile --config.ignore-scripts=false
+        pnpm rebuild esbuild
+        '''
+    }
+}
 
         stage('Type Check') {
             steps {
