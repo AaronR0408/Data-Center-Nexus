@@ -22,4 +22,4 @@ RUN cd artifacts/api-server && pnpm run build
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "cd artifacts/api-server && pnpm run start"]
+CMD ["sh", "-c", "cd artifacts/dcim-frontend && pnpm run serve -- --host 0.0.0.0 --port 3000"]
