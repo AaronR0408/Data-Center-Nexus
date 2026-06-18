@@ -80,11 +80,23 @@ stage('Build API Server') {
         '''
     }
 }
-stage('Docker Build') {
+stage('Docker Build and Push') {
     steps {
-        sh '''
-        docker build -t data-center-nexus .
-        '''
+        withCredentials([usernamePassword(
+            credentialsId: 'dockerhub-creds',
+            usernameVariable: 'DOCKER_USER',
+            passwordVariable: 'DOCKER_PASS'
+        )]) {
+            sh '''
+            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+
+            docker build -t $DOCKER_USER/data-center-nexus:latest .
+            docker tag $DOCKER_USER/data-center-nexus:latest $DOCKER_USER/data-center-nexus:${GIT_COMMIT}
+
+            docker push $DOCKER_USER/data-center-nexus:latest
+            docker push $DOCKER_USER/data-center-nexus:${GIT_COMMIT}
+            '''
+        }
     }
 }
         stage('Deploy') {
