@@ -80,7 +80,13 @@ stage('Build API Server') {
         '''
     }
 }
-
+stage('Docker Build') {
+    steps {
+        sh '''
+        docker build -t data-center-nexus .
+        '''
+    }
+}
         stage('Deploy') {
             steps {
                 echo 'Deployment completed'
