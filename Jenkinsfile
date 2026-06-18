@@ -45,13 +45,23 @@ pipeline {
             }
         }
 
-        stage('Build') {
-            steps {
-                sh '''
-                pnpm run build
-                '''
-            }
-        }
+       stage('Build Frontend') {
+    steps {
+        sh '''
+        cd artifacts/dcim-frontend
+        pnpm run build
+        '''
+    }
+}
+
+stage('Build API Server') {
+    steps {
+        sh '''
+        cd artifacts/api-server
+        pnpm run build
+        '''
+    }
+}
 
         stage('Deploy') {
             steps {
